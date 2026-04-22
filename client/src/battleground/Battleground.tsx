@@ -16,6 +16,8 @@ export const Battleground = () => {
 
     let x = 400;
     let y = 300;
+    let prevX = x;
+    let prevY = y;
     let angle = 0;
 
     const keys = new Set<string>();
@@ -27,37 +29,75 @@ export const Battleground = () => {
     window.addEventListener("keyup", onKeyUp);
 
     let lastTime: number | null = null;
-    const trail: [number, number][] = [[x, y]];
+    const grid = new Uint8Array(WIDTH * HEIGHT);
+
+    const collisionDetected = () => {
+      ctx.font = "48px sans-serif";
+      ctx.fillStyle = "red";
+      ctx.textAlign = "center";
+      ctx.fillText("COLLISION DETECTED", WIDTH / 2, HEIGHT / 2);
+    };
+
+    const pixelIndex = (x: number, y: number) => {
+      return Math.floor(y) * WIDTH + Math.floor(x);
+    };
+
+    const markLine = (x0: number, y0: number, x1: number, y1: number) => {
+      const steps = Math.ceil(Math.hypot(x1 - x0, y1 - y0));
+
+      for (let i = 0; i < steps; i++) {
+        const t = steps === 0 ? 0 : i / steps;
+        const ix = x0 + (x1 - x0) * t;
+        const iy = y0 + (y1 - y0) * t;
+
+        grid[pixelIndex(ix, iy)] = 1;
+      }
+    };
+
+    let frameCount = 0;
 
     const loop = (now: number) => {
       if (lastTime === null) lastTime = now;
 
-      const dt = (now - lastTime) / 1000; // seconds since last frame
+      const dt = Math.min((now - lastTime) / 1000, 1 / 30); // seconds since last frame
 
       lastTime = now;
 
-      console.log(keys);
-
       if (keys.has("ArrowLeft")) angle -= TURN_SPEED * dt;
       if (keys.has("ArrowRight")) angle += TURN_SPEED * dt;
+
+      prevX = x;
+      prevY = y;
 
       // move at exactly TICKRATE units per second regardless of frame rate
       x += Math.cos(angle) * TICKRATE * dt;
       y += Math.sin(angle) * TICKRATE * dt;
 
-      trail.push([x, y]);
-
-      ctx.beginPath();
-      ctx.moveTo(trail[0][0], trail[0][1]);
-
-      for (const [tx, ty] of trail) {
-        ctx.lineTo(tx, ty);
+      // wall collision
+      if (x < 0 || x > WIDTH || y < 0 || y > HEIGHT) {
+        collisionDetected();
+        return;
       }
 
+      // self collision — check before marking
+      if (grid[pixelIndex(x, y)]) {
+        console.log("collision at", x, y, "frame", frameCount);
+        console.log("self");
+        collisionDetected();
+        return;
+      }
+
+      markLine(prevX, prevY, x, y);
+
+      // draw only the new segment — O(1) regardless of trail length
+      ctx.beginPath();
+      ctx.moveTo(prevX, prevY);
+      ctx.lineTo(x, y);
       ctx.strokeStyle = "#000";
       ctx.lineWidth = 2;
-
       ctx.stroke();
+
+      frameCount++;
 
       fId = requestAnimationFrame(loop);
     };
@@ -69,7 +109,7 @@ export const Battleground = () => {
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
     };
-  });
+  }, []);
 
   return (
     <>
