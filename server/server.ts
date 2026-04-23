@@ -1,24 +1,33 @@
+import express from "express";
+import cors from "cors";
+
+const app = express();
+app.use(cors());
+
 class Player {
   angle: number;
-  id: string;
+  id: number;
   x: number;
   y: number;
-  prevX?: number;
-  prevY?: number;
+  prevX: number;
+  prevY: number;
   dead: boolean = false;
 
   collisionDetected = (tickCount: number) => {
     console.log(
       `collision detected player: ${this.id}, tick: ${tickCount}, x: ${this.x}, y: ${this.y}`,
     );
+
     this.dead = true;
   };
 
-  constructor(id: string) {
+  constructor(id: number) {
     this.id = id;
     this.angle = Math.random() * 360;
     this.x = Math.random() * Battleground.WIDTH;
     this.y = Math.random() * Battleground.HEIGHT;
+    this.prevX = this.x;
+    this.prevY = this.y;
   }
 }
 
@@ -40,15 +49,22 @@ class Battleground {
     return Math.floor(y) * Battleground.WIDTH + Math.floor(x);
   };
 
-  markLine = (x0: number, y0: number, x1: number, y1: number) => {
+  markLine = (player: Player) => {
+    const { x: x1, y: y1, prevX: x0, prevY: y0, id } = player;
     const steps = Math.ceil(Math.hypot(x1 - x0, y1 - y0));
 
     for (let i = 0; i < steps; i++) {
       const t = steps === 0 ? 0 : i / steps;
+
       const ix = x0 + (x1 - x0) * t;
       const iy = y0 + (y1 - y0) * t;
 
-      this.grid[this.pixelIndex(ix, iy)] = 1;
+      console.log("ix", ix);
+      console.log("iy", iy);
+
+      console.log("this.pixelIndex(ix, iy)", this.pixelIndex(ix, iy));
+
+      this.grid[this.pixelIndex(ix, iy)] = 1 + id;
     }
   };
 
@@ -80,19 +96,19 @@ class Battleground {
         }
 
         // self collision — check before marking
-        if (this.grid[this.pixelIndex(player.x, player.y)]) {
+        if (this.grid[this.pixelIndex(player.x, player.y)] > 0) {
           player.collisionDetected(this.tickCount);
           return;
         }
 
-        this.markLine(player.prevX, player.prevY, player.x, player.y);
+        this.markLine(player);
       }
     });
 
     const alive = this.players.filter((player) => !player.dead);
 
     if (alive.length === 0) {
-      throw new Error("ALL DEAD");
+      throw new Error("DRAW");
     }
 
     if (this.players.filter((player) => !player.dead).length === 1) {
@@ -105,11 +121,16 @@ class Battleground {
     this.tickCount++;
   }
 
-  constructor(players: string[]) {
+  constructor(players: number[]) {
     this.players = players.map((player) => new Player(player));
 
     this.battle();
   }
 }
 
-const battleground = new Battleground(["1", "2", "3"]);
+app.get("/simulation", (req, res) => {
+  const battleground = new Battleground([1, 2, 3]);
+  res.send({ grid: battleground.grid });
+});
+
+app.listen("3000");

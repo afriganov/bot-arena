@@ -6,7 +6,20 @@ const HEIGHT = 600;
 const TURN_SPEED = 2;
 
 export const Battleground = () => {
+  const getGrid = async () => {
+    console.log("fetch");
+    const grid = await fetch("http://localhost:3000/simulation");
+
+    const res = await grid.json();
+
+    console.log(res.grid);
+  };
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    getGrid();
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
